@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>《红楼梦》人物关系网络分析</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: "Noto Serif SC", serif;
+            background-color: #f9f5eb;
+            margin: 0;
+            padding: 0;
+            color: #233b43;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .title {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #c53727;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            font-size: 1.2rem;
+            color: #233b43;
+        }
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .btn {
+            padding: 8px 15px;
+            background-color: #233b43;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #c53727;
+        }
+        .btn.active {
+            background-color: #c53727;
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .filter-label {
+            font-weight: bold;
+        }
+        .filter-select {
+            padding: 6px 10px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        .plot-container {
+            width: 100%;
+            height: 500px;
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+        }
+        .tooltip {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 4px;
+            pointer-events: none;
+            max-width: 300px;
+            display: none;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">《红楼梦》人物关系网络分析</h1>
+            <p class="subtitle">探索古典名著中的人物关系与情节脉络</p>
+        </div>
+        
+        <div class="controls">
+            <div class="filter-group">
+                <label class="filter-label">家族:</label>
+                <select id="family-filter" class="filter-select">
+                    <option value="all">全部</option>
+                    <option value="jia">贾家</option>
+                    <option value="shi">史家</option>
+                    <option value="wang">王家</option>
+                    <option value="xue">薛家</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="filter-label">角色:</label>
+                <select id="role-filter" class="filter-select">
+                    <option value="all">全部</option>
+                    <option value="main">主要</option>
+                    <option value="secondary">次要</option>
+                </select>
+            </div>
+            <button id="reset-view" class="btn">重置视图</button>
+        </div>
+        
+        <div class="plot-container" id="network-container"></div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #c53727;"></div>
+                <span>贾家</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #233b43;"></div>
+                <span>史家</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #d4af37;"></div>
+                <span>王家</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #8b0000;"></div>
+                <span>薛家</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background-color: #6b8e23;"></div>
+                <span>其他</span>
+            </div>
+        </div>
+        
+        <div class="tooltip" id="tooltip">
+            <div id="tooltip-title" class="font-bold mb-2"></div>
+            <div id="tooltip-content"></div>
+        </div>
+    </div>
+
+    <script>
+        // 人物数据
+        const characters = [
+            { name: '贾宝玉', family: 'jia', role: 'main', centrality: 100, description: '荣国府衔玉而生的公子，前世为女娲补天剩余的通灵宝玉，后幻化成贾宝玉。' },
+            { name: '林黛玉', family: 'jia', role: 'main', centrality: 95, description: '贾母的外孙女，贾宝玉的姑表妹。自幼体弱多病，聪明伶俐，敏感细腻。' },
+            { name: '薛宝钗', family: 'xue', role: 'main', centrality: 90, description: '薛姨妈之女，贾宝玉的姨表姐。容貌美丽，举止娴雅，博学多才。' },
+            { name: '王熙凤', family: 'wang', role: 'main', centrality: 85, description: '贾琏的妻子，王夫人的内侄女。精明能干，深得贾母和王夫人的信任。' },
+            { name: '贾母', family: 'jia', role: 'main', centrality: 80, description: '贾府的最高长辈，史太君。她疼爱子孙，享受富贵荣华。' },
+            { name: '史湘云', family: 'shi', role: 'main', centrality: 70, description: '贾母的侄孙女，史侯家的千金。性格开朗豪爽，不拘小节，才情出众。' },
+            { name: '李纨', family: 'jia', role: 'secondary', centrality: 60, description: '贾珠的妻子，贾兰的母亲。她守寡后专心抚养儿子，性格温顺。' },
+            { name: '探春', family: 'jia', role: 'secondary', centrality: 55, description: '贾政与赵姨娘之女，贾宝玉的同父异母妹妹。她精明能干，有抱负。' },
+            { name: '袭人', family: 'jia', role: 'secondary', centrality: 40, description: '贾宝玉的首席丫鬟，原名珍珠。她温柔和顺，忠心耿耿。' },
+            { name: '晴雯', family: 'jia', role: 'secondary', centrality: 35, description: '贾宝玉的丫鬟，容貌美丽，性格直率，敢爱敢恨。' },
+            { name: '贾琏', family: 'jia', role: 'secondary', centrality: 30, description: '贾赦之子，王熙凤的丈夫。他风流成性，贪财好色。' },
+            { name: '贾珍', family: 'jia', role: 'secondary', centrality: 25, description: '贾敬之子，贾蓉之父。他是宁国府的当家人，为人荒淫无道。' },
+            { name: '香菱', family: 'xue', role: 'secondary', centrality: 10, description: '原名甄英莲，甄士隐之女。她自幼被拐，后被薛蟠强买为妾。' }
+        ];
+
+        // 关系数据
+        const relationships = [
+            { source: '贾宝玉', target: '林黛玉', type: 'love', weight: 10, description: '贾宝玉与林黛玉之间有着真挚的爱情，他们青梅竹马，两小无猜。' },
+            { source: '贾宝玉', target: '薛宝钗', type: 'marriage', weight: 8, description: '贾宝玉与薛宝钗奉家长之命成婚，但贾宝玉心中始终只有林黛玉。' },
+            { source: '贾宝玉', target: '王熙凤', type: 'family', weight: 7, description: '王熙凤是贾宝玉的堂嫂，她对贾宝玉十分疼爱。' },
+            { source: '贾宝玉', target: '贾母', type: 'family', weight: 9, description: '贾母是贾宝玉的祖母，她对贾宝玉极为疼爱，视其为心肝宝贝。' },
+            { source: '贾宝玉', target: '史湘云', type: 'family', weight: 7, description: '史湘云是贾宝玉的表妹，她性格开朗豪爽，与贾宝玉关系密切。' },
+            { source: '贾宝玉', target: '袭人', type: 'master-servant', weight: 8, description: '袭人是贾宝玉的首席丫鬟，她对贾宝玉忠心耿耿，无微不至地照顾他。' },
+            { source: '贾宝玉', target: '晴雯', type: 'master-servant', weight: 7, description: '晴雯是贾宝玉的丫鬟，她容貌美丽，性格直率，与贾宝玉关系亲密。' },
+            { source: '林黛玉', target: '薛宝钗', type: 'rivalry', weight: 6, description: '林黛玉与薛宝钗是情敌关系，她们都深爱着贾宝玉。' },
+            { source: '林黛玉', target: '王熙凤', type: 'family', weight: 5, description: '王熙凤是林黛玉的表嫂，她对林黛玉十分疼爱。' },
+            { source: '林黛玉', target: '贾母', type: 'family', weight: 8, description: '贾母是林黛玉的外祖母，她对林黛玉极为疼爱。' },
+            { source: '王熙凤', target: '贾琏', type: 'marriage', weight: 7, description: '王熙凤与贾琏是夫妻关系，他们的婚姻充满了矛盾和冲突。' },
+            { source: '王熙凤', target: '贾母', type: 'family', weight: 8, description: '王熙凤是贾母的孙媳妇，她深得贾母的信任和喜爱。' },
+            { source: '史湘云', target: '贾母', type: 'family', weight: 7, description: '史湘云是贾母的侄孙女，她常到贾府做客，与贾母关系密切。' },
+            { source: '史湘云', target: '薛宝钗', type: 'friendship', weight: 6, description: '史湘云与薛宝钗关系友好，她们常在一起吟诗作画。' },
+            { source: '薛宝钗', target: '香菱', type: 'master-servant', weight: 6, description: '薛宝钗对香菱较为照顾，教她读书识字。' },
+            { source: '李纨', target: '贾宝玉', type: 'family', weight: 6, description: '李纨是贾宝玉的嫂子，她对贾宝玉的才华和性格颇为欣赏。' },
+            { source: '李纨', target: '王熙凤', type: 'family', weight: 5, description: '李纨与王熙凤是妯娌关系，她们的性格截然不同。' },
+            { source: '李纨', target: '贾母', type: 'family', weight: 6, description: '李纨是贾母的孙媳妇，贾母对她的儿子贾兰十分疼爱。' },
+            { source: '探春', target: '贾宝玉', type: 'family', weight: 7, description: '探春是贾宝玉的同父异母妹妹，她性格精明能干，与贾宝玉关系密切。' },
+            { source: '探春', target: '王熙凤', type: 'family', weight: 5, description: '探春与王熙凤是姑侄关系，王熙凤对探春的才能颇为欣赏。' },
+            { source: '袭人', target: '晴雯', type: 'rivalry', weight: 5, description: '晴雯与袭人是情敌关系，她们都深爱着贾宝玉。' },
+            { source: '贾琏', target: '贾珍', type: 'family', weight: 8, description: '贾琏与贾珍是堂兄弟关系，他们关系密切。' },
+            { source: '贾珍', target: '香菱', type: 'connection', weight: 3, description: '通过家族事务产生的联系。' }
+        ];
+
+        // 创建echarts实例
+        const chartDom = document.getElementById('network-container');
+        const myChart = echarts.init(chartDom);
+        
+        // 颜色映射
+        const familyColors = {
+            'jia': '#c53727',    // 贾家 - 朱红
+            'shi': '#233b43',    // 史家 - 黛青
+            'wang': '#d4af37',   // 王家 - 金色
+            'xue': '#8b0000',    // 薛家 - 深红
+            'other': '#6b8e23'   // 其他 - 绿色
+        };
+        
+        // 关系类型映射
+        const relationshipTypes = {
+            'love': { symbol: 'circle', color: '#c53727', lineStyle: 'solid' },
+            'marriage': { symbol: 'diamond', color: '#233b43', lineStyle: 'solid' },
+            'family': { symbol: 'square', color: '#6b8e23', lineStyle: 'solid' },
+            'friendship': { symbol: 'triangle', color: '#d4af37', lineStyle: 'solid' },
+            'rivalry': { symbol: 'cross', color: '#8b0000', lineStyle: 'dashed' },
+            'master-servant': { symbol: 'arrow', color: '#6b8e23', lineStyle: 'solid' },
+            'connection': { symbol: 'circle', color: '#808080', lineStyle: 'dashed' }
+        };
+        
+        // 初始化图表
+        function initChart() {
+            const option = {
+                tooltip: {
+                    show: true,
+                    trigger: 'item',
+                    formatter: function(params) {
+                        if (params.dataType === 'edge') {
+                            return `<div><strong>${params.source}</strong> 和 <strong>${params.target}</strong></div>
+                                    <div>关系: ${params.data.type}</div>
+                                    <div>描述: ${params.data.description}</div>`;
+                        } else {
+                            const character = characters.find(c => c.name === params.name);
+                            return `<div><strong>${params.name}</strong></div>
+                                    <div>家族: ${getFamilyName(character.family)}</div>
+                                    <div>角色: ${getRoleName(character.role)}</div>
+                                    <div>描述: ${character.description}</div>`;
+                        }
+                    }
+                },
+                legend: {
+                    show: false
+                },
+                series: [
+                    {
+                        type: 'graph',
+                        layout: 'force',
+                        data: characters.map(character => ({
+                            name: character.name,
+                            value: character.centrality,
+                            symbolSize: Math.sqrt(character.centrality) * 3,
+                            category: character.family,
+                            itemStyle: {
+                                color: familyColors[character.family]
+                            },
+                            label: {
+                                show: true,
+                                position: 'top',
+                                formatter: '{b}'
+                            }
+                        })),
+                        links: relationships.map(relation => ({
+                            source: relation.source,
+                            target: relation.target,
+                            value: relation.weight,
+                            lineStyle: {
+                                width: relation.weight,
+                                color: relationshipTypes[relation.type].color,
+                                type: relationshipTypes[relation.type].lineStyle
+                            },
+                            label: {
+                                show: false
+                            },
+                            tooltip: {
+                                show: true
+                            },
+                            type: relation.type,
+                            description: relation.description
+                        })),
+                        categories: Object.keys(familyColors).map(family => ({
+                            name: family
+                        })),
+                        force: {
+                            repulsion: 1000,
+                            edgeLength: [50, 150],
+                            gravity: 0.1
+                        },
+                        roam: true,
+                        focusNodeAdjacency: true,
+                        animation: true
+                    }
+                ]
+            };
+            
+            myChart.setOption(option);
+        }
+        
+        // 过滤家族
+        document.getElementById('family-filter').addEventListener('change', function() {
+            filterChart();
+        });
+        
+        // 过滤角色
+        document.getElementById('role-filter').addEventListener('change', function() {
+            filterChart();
+        });
+        
+        // 重置视图
+        document.getElementById('reset-view').addEventListener('click', function() {
+            document.getElementById('family-filter').value = 'all';
+            document.getElementById('role-filter').value = 'all';
+            filterChart();
+        });
+        
+        // 过滤图表
+        function filterChart() {
+            const familyFilter = document.getElementById('family-filter').value;
+            const roleFilter = document.getElementById('role-filter').value;
+            
+            let filteredCharacters = [...characters];
+            if (familyFilter !== 'all') {
+                filteredCharacters = filteredCharacters.filter(c => c.family === familyFilter);
+            }
+            if (roleFilter !== 'all') {
+                filteredCharacters = filteredCharacters.filter(c => c.role === roleFilter);
+            }
+            
+            // 过滤关系
+            const filteredCharacterNames = filteredCharacters.map(c => c.name);
+            const filteredRelationships = relationships.filter(r => 
+                filteredCharacterNames.includes(r.source) && 
+                filteredCharacterNames.includes(r.target)
+            );
+            
+            // 更新图表
+            const option = myChart.getOption();
+            option.series[0].data = filteredCharacters.map(character => ({
+                name: character.name,
+                value: character.centrality,
+                symbolSize: Math.sqrt(character.centrality) * 3,
+                category: character.family,
+                itemStyle: {
+                    color: familyColors[character.family]
+                },
+                label: {
+                    show: true,
+                    position: 'top',
+                    formatter: '{b}'
+                }
+            }));
+            
+            option.series[0].links = filteredRelationships.map(relation => ({
+                source: relation.source,
+                target: relation.target,
+                value: relation.weight,
+                lineStyle: {
+                    width: relation.weight,
+                    color: relationshipTypes[relation.type].color,
+                    type: relationshipTypes[relation.type].lineStyle
+                },
+                label: {
+                    show: false
+                },
+                tooltip: {
+                    show: true
+                },
+                type: relation.type,
+                description: relation.description
+            }));
+            
+            myChart.setOption(option);
+        }
+        
+        // 辅助函数：获取家族名称
+        function getFamilyName(family) {
+            const familyNames = {
+                'jia': '贾家',
+                'shi': '史家',
+                'wang': '王家',
+                'xue': '薛家',
+                'other': '其他'
+            };
+            return familyNames[family] || family;
+        }
+        
+        // 辅助函数：获取角色名称
+        function getRoleName(role) {
+            const roleNames = {
+                'main': '主要角色',
+                'secondary': '次要角色',
+                'servant': '仆人'
+            };
+            return roleNames[role] || role;
+        }
+        
+        // 窗口大小变化时重绘图表
+        window.addEventListener('resize', function() {
+            myChart.resize();
+        });
+        
+        // 初始化图表
+        initChart();
+    </script>
+</body>
+</html>
